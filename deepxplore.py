@@ -65,25 +65,43 @@ class NeuronCoverageTracker:
         """Attach a forward hook to every ReLU in the model."""
         for name, module in model.named_modules():
             if isinstance(module, nn.ReLU):
+                # Use module's object id to guarantee uniqueness.
+                # The same ReLU instance can appear under different names
+                # (e.g. inplace reuse), so id() gives a stable unique key.
+                unique_key = f"{name}__{id(module)}"
                 hook = module.register_forward_hook(
-                    self._make_hook(name)
+                    self._make_hook(unique_key)
                 )
                 self.hooks.append(hook)
 
-    def _make_hook(self, layer_name: str):
+    def _make_hook(self, layer_key: str):
         def hook_fn(module, input, output):
             # output shape: (batch, C, H, W) or (batch, C)
-            # Flatten spatial dims → (batch, neurons)
             flat = output.detach().view(output.size(0), -1)  # (B, N)
 
             # A neuron is "covered" if ANY sample in the batch exceeds threshold
             newly_covered = (flat > self.threshold).any(dim=0)  # (N,)
 
-            if layer_name not in self.activated:
-                self.activated[layer_name] = newly_covered
+            if layer_key not in self.activated:
+                # First time seeing this layer — initialise entry
+                self.activated[layer_key] = newly_covered.clone()
                 self.total_neurons += newly_covered.numel()
             else:
-                self.activated[layer_name] |= newly_covered
+                existing = self.activated[layer_key]
+                if existing.shape == newly_covered.shape:
+                    # Normal case: OR in new activations
+                    self.activated[layer_key] = existing | newly_covered
+                else:
+                    # Shape mismatch (e.g. different spatial resolution on
+                    # second call): create a separate entry with a suffix
+                    fallback_key = f"{layer_key}__sz{newly_covered.numel()}"
+                    if fallback_key not in self.activated:
+                        self.activated[fallback_key] = newly_covered.clone()
+                        self.total_neurons += newly_covered.numel()
+                    else:
+                        self.activated[fallback_key] = (
+                            self.activated[fallback_key] | newly_covered
+                        )
 
         return hook_fn
 
