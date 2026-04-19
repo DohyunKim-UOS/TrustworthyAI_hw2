@@ -143,3 +143,7 @@ python test.py --model_a models/model_a_best.pth \
 3. **Forward hook 기반 뉴런 커버리지** — 모델 구조를 변경하지 않고 `register_forward_hook`을 모든 ReLU 레이어에 등록하여 뉴런 활성화를 추적합니다. ResNet의 Bottleneck 블록에서 ReLU 인스턴스가 공유될 때 발생하는 키 충돌을 방지하기 위해 `id(module)`을 키에 포함했습니다.
 4. **Joint loss 설계** — disagreement loss(두 모델의 예측을 벌리는 방향)와 coverage loss(평균 활성화 최대화)를 `lambda_cov` 가중치로 결합했습니다.
 5. **FGSM 방식의 반복 perturbation** — 원본의 도메인별 변환 대신, L-inf projection을 적용한 반복적 gradient sign 업데이트(PGD 방식)를 사용했습니다.
+
+## LLM 활용 명시
+1. README.md 파일을 작성하는데 LLM을 활용하였음.
+2. deepxplore.py 파일의 작성과 디버깅에 LLM을 활용하였음.
